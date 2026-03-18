@@ -1,0 +1,31 @@
+name: SonarCloud Analysis
+
+on:
+  push:
+    # O SonarCloud analisará cada commit feito nestas branches
+    branches:
+      - main
+      - sprint-1
+      - sprint-2
+      - sprint-3
+  pull_request:
+    # O SonarCloud analisará o PR quando o destino (target) for a main
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarcloud:
+    name: SonarCloud Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4 # Atualizado para v4 (mais estável)
+        with:
+          fetch-depth: 0  # Necessário para que o Sonar analise o histórico e blame
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
