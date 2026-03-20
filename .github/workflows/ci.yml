@@ -25,7 +25,8 @@ jobs:
           fetch-depth: 0  # Necessário para que o Sonar analise o histórico e blame
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        # Substituímos @master pelo hash estável da versão v3.1.0
+        uses: SonarSource/sonarcloud-github-action@db501078e937e4fd9c9e42994406022819776090
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
