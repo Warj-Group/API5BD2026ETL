@@ -2,7 +2,7 @@ import os
 import logging
 from sqlalchemy import create_engine
 
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 
 def get_engine():
