@@ -18,7 +18,7 @@ def main():
     logger.info("Pipeline ETL finalizado.")
 
 
-if _name_ == "_main_":
+if __name__ == "_main_":
     main()
 
 
