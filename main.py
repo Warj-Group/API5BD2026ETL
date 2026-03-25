@@ -7,7 +7,7 @@ from load import run_load
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -22,7 +22,7 @@ if _name_ == "_main_":
     main()
 
 
----
+"""
 
 **`requirements.txt`**
 
@@ -59,3 +59,4 @@ _pycache_/
 data/
 *.csv
 *.xlsx
+"""
