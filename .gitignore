@@ -1,0 +1,10 @@
+venv/
+.venv/
+.env
+_pycache_/
+*.pyc
+*.log
+.idea/
+data/
+*.csv
+*.xlsx
