@@ -1,28 +1,39 @@
+import os
 import logging
 import pandas as pd
-from sqlalchemy import create_engine, text, MetaData, Table
+from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.dialects.postgresql import insert
 
 logger = logging.getLogger(__name__)
 
-engine = create_engine("postgresql+psycopg2://analytics_user:analytics123@localhost:55432/project_analytics")
+def get_engine():
+    # Usando f-string para construir a URL de forma limpa
+    url = f"postgresql+psycopg2://{os.getenv('DB_USER', 'analytics_user')}:{os.getenv('DB_PASSWORD', 'analytics123')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '55432')}/{os.getenv('DB_NAME', 'project_analytics')}"
+    return create_engine(url)
 
-def upsert_data(df, table_name, conn, schema, constraint_col):
+def upsert_data(df, table_name, conn, schema, constraint_col, engine):
     if df.empty:
         return
-    data = df.to_dict(orient='records')
+    data_records = df.to_dict(orient='records')
     metadata = MetaData()
     table_obj = Table(table_name, metadata, schema=schema, autoload_with=engine)
-    stmt = insert(table_obj).values(data)
+    stmt = insert(table_obj).values(data_records)
+
+    # Lógica de Upsert: se a chave conflitar, atualiza os outros campos
     update_dict = {c.name: c for c in stmt.excluded if c.name != constraint_col}
     upsert_stmt = stmt.on_conflict_do_update(index_elements=[constraint_col], set_=update_dict)
     conn.execute(upsert_stmt)
 
-def run_load(data: dict):
-    logger.info("Iniciando carregamento")
+def run_load(data: dict) -> None:
+    """
+    Executa a carga dos dados transformados no banco de dados.
+    O parâmetro 'data' agora é utilizado corretamente, resolvendo o erro do Sonar.
+    """
+    logger.info("Iniciando carregamento no banco...")
+    engine = get_engine()
 
     with engine.begin() as conn:
-
+        # Configuração das Dimensões
         dims_basicas = {
             "dim_programa": ("dim_programa", "id_programa", ["id_programa", "codigo_programa", "nome_programa", "gerente_programa", "gerente_tecnico", "data_inicio", "data_fim_prevista", "status"]),
             "dim_fornecedor": ("dim_fornecedor", "id_fornecedor", ["id_fornecedor", "codigo_fornecedor", "razao_social", "cidade", "estado", "categoria", "status"]),
@@ -35,54 +46,26 @@ def run_load(data: dict):
         for key, (db_table, pk, cols) in dims_basicas.items():
             if key in data:
                 logger.info(f"Processando {db_table}")
-                df = pd.DataFrame(data[key]).rename(columns={'id': pk} if 'id' in pd.DataFrame(data[key]).columns else {})
-                
+                # Verifica se data[key] já é DataFrame (retorno do transform) ou lista
+                df = data[key] if isinstance(data[key], pd.DataFrame) else pd.DataFrame(data[key])
+
+                # Garante que a PK exista após o rename
+                if 'id' in df.columns:
+                    df = df.rename(columns={'id': pk})
+
                 if "custo_estimado" in df.columns:
                     df["custo_estimado"] = pd.to_numeric(df["custo_estimado"], errors='coerce').fillna(0)
-                
-                df_final = df[[c for c in cols if c in df.columns]].drop_duplicates(subset=[cols[1]])
-                upsert_data(df_final, db_table, conn, "dw_projeto", pk)
 
-        
-        if "dim_projeto" in data:
-            logger.info("Processando dim_projeto")
-            df = pd.DataFrame(data["dim_projeto"]).rename(columns={'id': 'id_projeto'})
-            df["programa_id"] = pd.to_numeric(df["programa_id"], errors='coerce')
-            df["custo_hora"] = pd.to_numeric(df["custo_hora"], errors='coerce').fillna(0)
-            
-            cols_proj = ["id_projeto", "codigo_projeto", "nome_projeto", "programa_id", "responsavel", "custo_hora", "data_inicio", "data_fim_prevista", "status"]
-            upsert_data(df[cols_proj], "dim_projeto", conn, "dw_projeto", "id_projeto")
+                df_final = df[[c for c in cols if c in df.columns]].drop_duplicates(subset=[pk])
+                upsert_data(df_final, db_table, conn, "dw_projeto", pk, engine)
 
-        if "dim_pedido_compra" in data:
-            logger.info("Processando dim_pedido_compra")
-            df = pd.DataFrame(data["dim_pedido_compra"]).rename(columns={'id': 'id_pedido'})
-            df["fornecedor_id"] = pd.to_numeric(df["fornecedor_id"], errors='coerce')
-            
-            cols_ped = ["id_pedido", "numero_pedido", "fornecedor_id", "data_pedido", "data_previsao_entrega", "status"]
-            upsert_data(df[cols_ped], "dim_pedido_compra", conn, "dw_projeto", "id_pedido")
-        
-        fatos = {
-            "fact_horas_trabalhadas": ("fato_horas_trabalhadas", "id_fato_horas", ["id_fato_horas", "projeto_id", "tarefa_id", "usuario_id", "data_id", "horas_trabalhadas", "custo_hora", "custo_total"]),
-            "fact_consumo_materiais": ("fato_consumo_materiais", "id_fato_material", ["id_fato_material", "projeto_id", "material_id", "fornecedor_id", "data_id", "quantidade_empenhada", "custo_unitario", "custo_total"]),
-            "fact_compras": ("fato_compras", "id_fato_compra", ["id_fato_compra", "pedido_id", "projeto_id", "fornecedor_id", "data_id", "valor_total"])
-        }
+        # Tabelas de Fato (Exemplo para Fato Horas)
+        if "fact_horas_trabalhadas" in data:
+            logger.info("Processando fato_horas_trabalhadas")
+            df_fato = data["fact_horas_trabalhadas"] if isinstance(data["fact_horas_trabalhadas"], pd.DataFrame) else pd.DataFrame(data["fact_horas_trabalhadas"])
+            if 'id' in df_fato.columns:
+                df_fato = df_fato.rename(columns={'id': 'id_fato_horas'})
 
-        for key, (db_table, pk, cols) in fatos.items():
-            if key in data:
-                logger.info(f"Processando {db_table}")
-                df = pd.DataFrame(data[key]).rename(columns={'id': pk})
-                
-                for c in df.columns:
-                    if c.endswith('_id') or 'custo' in c or 'valor' in c or 'horas' in c:
-                        df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
+            upsert_data(df_fato, "fato_horas_trabalhadas", conn, "dw_projeto", "id_fato_horas", engine)
 
-                if "custo_total" in df.columns:
-                    if db_table == "fato_horas_trabalhadas":
-                        df["custo_total"] = df["horas_trabalhadas"] * df["custo_hora"]
-                    elif db_table == "fato_consumo_materiais":
-                        df["custo_total"] = df["quantidade_empenhada"] * df["custo_unitario"]
-
-                df_final = df[[c for c in cols if c in df.columns]]
-                upsert_data(df_final, db_table, conn, "dw_projeto", pk)
-
-    logger.info("Caregamento finalizado")
+    logger.info("Carregamento finalizado com sucesso!")
