@@ -24,6 +24,62 @@ def upsert_data(df, table_name, conn, schema, constraint_col, engine):
     upsert_stmt = stmt.on_conflict_do_update(index_elements=[constraint_col], set_=update_dict)
     conn.execute(upsert_stmt)
 
+    def map_usuario(df, conn):
+    usuarios = pd.read_sql("SELECT id_usuario, nome_usuario FROM dw_projeto.dim_usuario", conn)
+
+    df = df.merge(usuarios, left_on="usuario", right_on="nome_usuario", how="left")
+    df = df.rename(columns={"id_usuario": "usuario_id"})
+    df = df.drop(columns=["usuario", "nome_usuario"], errors="ignore")
+
+    return df
+
+
+def map_projeto(df, conn):
+    projetos = pd.read_sql("SELECT id_projeto, codigo_projeto FROM dw_projeto.dim_projeto", conn)
+
+    df = df.merge(projetos, on="codigo_projeto", how="left")
+    df = df.rename(columns={"id_projeto": "projeto_id"})
+
+    return df
+
+
+def map_tarefa(df, conn):
+    tarefas = pd.read_sql("SELECT id_tarefa, codigo_tarefa FROM dw_projeto.dim_tarefa", conn)
+
+    df = df.merge(tarefas, on="codigo_tarefa", how="left")
+    df = df.rename(columns={"id_tarefa": "tarefa_id"})
+
+    return df
+
+
+def map_material(df, conn):
+    materiais = pd.read_sql("SELECT id_material, codigo_material FROM dw_projeto.dim_material", conn)
+
+    df = df.merge(materiais, on="codigo_material", how="left")
+    df = df.rename(columns={"id_material": "material_id"})
+
+    return df
+
+
+def map_fornecedor(df, conn):
+    fornecedores = pd.read_sql("SELECT id_fornecedor, codigo_fornecedor FROM dw_projeto.dim_fornecedor", conn)
+
+    df = df.merge(fornecedores, on="codigo_fornecedor", how="left")
+    df = df.rename(columns={"id_fornecedor": "fornecedor_id"})
+
+    return df
+
+
+def map_data(df, conn):
+    datas = pd.read_sql("SELECT id_data, data FROM dw_projeto.dim_data", conn)
+
+    df = df.merge(datas, on="data", how="left")
+    df = df.rename(columns={"id_data": "data_id"})
+    df = df.drop(columns=["data"], errors="ignore")
+
+    return df
+
+
 def run_load(data: dict) -> None:
     logger.info("Iniciando carregamento no banco...")
     engine = get_engine()
