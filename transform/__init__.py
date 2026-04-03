@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 #transform/__init__.py
+=======
+>>>>>>> c192892bc66355395396af2e8c87c539d844fad0
 import pandas as pd
 import logging
 
@@ -16,6 +19,10 @@ def convert_dates(df, columns):
     return df
 
 def remove_ids(df, table_name=""):
+<<<<<<< HEAD
+=======
+    """Remove IDs primários mas mantém chaves estrangeiras"""
+>>>>>>> c192892bc66355395396af2e8c87c539d844fad0
     foreign_keys = ["programa_id", "projeto_id", "tarefa_id", "usuario_id", "material_id", "fornecedor_id", "data_id"]
     
     cols_to_drop = []
@@ -35,6 +42,10 @@ def clean_strings(df):
 
 
 def clean_horas_trabalhadas(df):
+<<<<<<< HEAD
+=======
+    """Remove valores inválidos (datas) da coluna horas_trabalhadas"""
+>>>>>>> c192892bc66355395396af2e8c87c539d844fad0
     if "horas_trabalhadas" not in df.columns:
         return df
     

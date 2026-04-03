@@ -7,11 +7,21 @@ from sqlalchemy.dialects.postgresql import insert
 logger = logging.getLogger(__name__)
 
 def normalize_dataframe(df):
+<<<<<<< HEAD
+=======
+    """Converte NaN para None (NULL) e garante tipos corretos para IDs"""
+>>>>>>> c192892bc66355395396af2e8c87c539d844fad0
     id_columns = [col for col in df.columns if col.endswith("_id") or col == "id"]
     
     for col in id_columns:
         if col in df.columns:
+<<<<<<< HEAD
             df[col] = df[col].where(pd.notna(df[col]), None)
+=======
+            # Converte NaN para None
+            df[col] = df[col].where(pd.notna(df[col]), None)
+            # Converte para Int64 (nullable integer)
+>>>>>>> c192892bc66355395396af2e8c87c539d844fad0
             try:
                 df[col] = df[col].astype("Int64")
             except (ValueError, TypeError):
@@ -147,7 +157,11 @@ def map_data(df, conn):
     return df   
 
 def run_load(data: dict) -> None:
+<<<<<<< HEAD
     logger.info("Iniciando carregamento no banco")
+=======
+    logger.info("Iniciando carregamento no banco...")
+>>>>>>> c192892bc66355395396af2e8c87c539d844fad0
     engine = get_engine()
 
     with engine.begin() as conn:
