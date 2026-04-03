@@ -7,14 +7,11 @@ from sqlalchemy.dialects.postgresql import insert
 logger = logging.getLogger(__name__)
 
 def normalize_dataframe(df):
-    """Converte NaN para None (NULL) e garante tipos corretos para IDs"""
     id_columns = [col for col in df.columns if col.endswith("_id") or col == "id"]
     
     for col in id_columns:
         if col in df.columns:
-            # Converte NaN para None
             df[col] = df[col].where(pd.notna(df[col]), None)
-            # Converte para Int64 (nullable integer)
             try:
                 df[col] = df[col].astype("Int64")
             except (ValueError, TypeError):
