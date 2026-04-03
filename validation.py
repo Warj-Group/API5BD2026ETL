@@ -1,5 +1,3 @@
-validation
-
 import logging
 from sqlalchemy import text
 from load import get_engine
