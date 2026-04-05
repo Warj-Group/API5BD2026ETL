@@ -15,7 +15,6 @@ def convert_dates(df, columns):
     return df
 
 def remove_ids(df, table_name=""):
-    """Remove IDs primários mas mantém chaves estrangeiras"""
     foreign_keys = ["programa_id", "projeto_id", "tarefa_id", "usuario_id", "material_id", "fornecedor_id", "data_id"]
     
     cols_to_drop = []
@@ -35,7 +34,6 @@ def clean_strings(df):
 
 
 def clean_horas_trabalhadas(df):
-    """Remove valores inválidos (datas) da coluna horas_trabalhadas"""
     if "horas_trabalhadas" not in df.columns:
         return df
     

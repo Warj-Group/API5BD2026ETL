@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from extract import run_extract
 from transform import run_transform
 from load import run_load
+from validation import validar_carga
 
 load_dotenv()
 
@@ -15,7 +16,8 @@ def main():
     raw_data = run_extract()
     transformed_data = run_transform(raw_data)
     run_load(transformed_data)
-    logger.info("Pipeline ETL finalizado.")
+    validar_carga()
+    logger.info("Pipeline ETL finalizado com sucesso.")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,9 @@ def normalize_dataframe(df):
     for col in id_columns:
         if col in df.columns:
             df[col] = df[col].where(pd.notna(df[col]), None)
+
+            df[col] = df[col].where(pd.notna(df[col]), None)
+            df[col] = df[col].where(pd.notna(df[col]), None)
             try:
                 df[col] = df[col].astype("Int64")
             except (ValueError, TypeError):
