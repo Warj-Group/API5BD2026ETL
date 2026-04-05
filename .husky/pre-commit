@@ -1,0 +1,12 @@
+#/bin/bash
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+REGEX="^^(main^|sprint-[0-9]+^)$^|^^(feature^|hotfix^|release^)\/WARJ-[0-9]+-.+$"
+if [[  $BRANCH =~ $REGEX ]]; then
+  echo -e "\n\033[0;31mXXXX ERRO: Nome da branch fora do padrao Warj-Group\033[0m"
+  exit 1
+fi
+echo "⚡ Validando codigo Python com Ruff..."
+ruff check .
+ruff format --check .
+echo "🔍 Checando tipagem com Mypy..."
+mypy .
