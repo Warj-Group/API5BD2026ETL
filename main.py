@@ -1,13 +1,17 @@
 import logging
+
 from dotenv import load_dotenv
+
 from extract import run_extract
-from transform import run_transform
 from load import run_load
+from transform import run_transform
 from validation import validar_carga
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 

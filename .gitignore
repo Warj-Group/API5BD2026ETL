@@ -37,7 +37,6 @@ Desktop.ini
 _site/
 build/
 dist/
-public/
 out/
 
 # MkDocs

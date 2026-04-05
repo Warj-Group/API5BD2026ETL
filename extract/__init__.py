@@ -1,8 +1,10 @@
-import os
-import pandas as pd
 import logging
+import os
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
+
 
 def identificar_tabela(df: pd.DataFrame) -> str:
     colunas = set(df.columns)
@@ -29,9 +31,8 @@ def identificar_tabela(df: pd.DataFrame) -> str:
         raise ValueError(f"Não foi possível identificar a tabela: {colunas}")
 
 
-def run_extract() -> dict:
-    logger.info("Extraindo dados")
-    data_path = "data"
+def _read_source_files(data_path: str) -> dict:
+    """Lê os arquivos do diretório e os carrega em DataFrames."""
     temp_data = {}
 
     for file in os.listdir(data_path):
@@ -52,37 +53,84 @@ def run_extract() -> dict:
 
         except Exception as e:
             logger.error(f"Erro ao processar {file}: {e}")
-    
-    if "fact_horas_trabalhadas" in temp_data:
-        usuarios_df = pd.DataFrame(temp_data["fact_horas_trabalhadas"])[["usuario"]].drop_duplicates()
-        usuarios_df.columns = ["nome_usuario"]
-        usuarios_df = usuarios_df.reset_index(drop=True)
-        usuarios_df.insert(0, "id_usuario", range(1, len(usuarios_df) + 1))
-        temp_data["dim_usuario"] = usuarios_df.to_dict(orient="records")
-        logger.info(f"Gerada dim_usuario com {len(usuarios_df)} registros")
 
-    if "fact_horas_trabalhadas" in temp_data:
-        datas_df = pd.DataFrame(temp_data["fact_horas_trabalhadas"])[["data"]].drop_duplicates()
-        datas_df = datas_df.dropna(subset=["data"])
-        datas_df["data"] = pd.to_datetime(datas_df["data"], errors="coerce").dt.date
-        datas_df = datas_df.drop_duplicates().sort_values("data").reset_index(drop=True)
-        datas_df.insert(0, "id_data", range(1, len(datas_df) + 1))
-        datas_df["dia"] = datas_df["data"].apply(lambda x: x.day if pd.notna(x) else None)
-        datas_df["mes"] = datas_df["data"].apply(lambda x: x.month if pd.notna(x) else None)
-        datas_df["ano"] = datas_df["data"].apply(lambda x: x.year if pd.notna(x) else None)
-        datas_df["trimestre"] = datas_df["mes"].apply(lambda x: (x-1)//3 + 1 if pd.notna(x) else None)
-        datas_df["dia_semana"] = datas_df["data"].apply(lambda x: x.weekday() if pd.notna(x) else None)
-        
-        meses = {1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
-                 7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"}
-        datas_df["nome_mes"] = datas_df["mes"].map(meses)
+    return temp_data
 
-        dias = {0: "Segunda", 1: "Terça", 2: "Quarta", 3: "Quinta", 4: "Sexta", 5: "Sábado", 6: "Domingo"}
-        datas_df["nome_dia_semana"] = datas_df["dia_semana"].map(dias)
-        
-        temp_data["dim_data"] = datas_df.to_dict(orient="records")
-        logger.info(f"Gerada dim_data com {len(datas_df)} registros")
-    
+
+def _generate_dim_usuario(temp_data: dict) -> None:
+    """Gera a dimensão de usuário a partir dos dados de horas trabalhadas."""
+    if "fact_horas_trabalhadas" not in temp_data:
+        return
+
+    usuarios_df = pd.DataFrame(temp_data["fact_horas_trabalhadas"])[
+        ["usuario"]
+    ].drop_duplicates()
+
+    usuarios_df.columns = ["nome_usuario"]
+    usuarios_df = usuarios_df.reset_index(drop=True)
+    usuarios_df.insert(0, "id_usuario", range(1, len(usuarios_df) + 1))
+
+    temp_data["dim_usuario"] = usuarios_df.to_dict(orient="records")
+    logger.info(f"Gerada dim_usuario com {len(usuarios_df)} registros")
+
+
+def _generate_dim_data(temp_data: dict) -> None:
+    """Gera a dimensão de data enriquecida a partir da fato de horas."""
+    if "fact_horas_trabalhadas" not in temp_data:
+        return
+
+    datas_df = pd.DataFrame(temp_data["fact_horas_trabalhadas"])[
+        ["data"]
+    ].drop_duplicates()
+
+    datas_df = datas_df.dropna(subset=["data"])
+    datas_df["data"] = pd.to_datetime(datas_df["data"], errors="coerce").dt.date
+    datas_df = datas_df.drop_duplicates().sort_values("data").reset_index(drop=True)
+    datas_df.insert(0, "id_data", range(1, len(datas_df) + 1))
+
+    datas_df["dia"] = datas_df["data"].apply(lambda x: x.day if pd.notna(x) else None)
+    datas_df["mes"] = datas_df["data"].apply(lambda x: x.month if pd.notna(x) else None)
+    datas_df["ano"] = datas_df["data"].apply(lambda x: x.year if pd.notna(x) else None)
+    datas_df["trimestre"] = datas_df["mes"].apply(
+        lambda x: (x - 1) // 3 + 1 if pd.notna(x) else None
+    )
+    datas_df["dia_semana"] = datas_df["data"].apply(
+        lambda x: x.weekday() if pd.notna(x) else None
+    )
+
+    meses = {
+        1: "Janeiro",
+        2: "Fevereiro",
+        3: "Março",
+        4: "Abril",
+        5: "Maio",
+        6: "Junho",
+        7: "Julho",
+        8: "Agosto",
+        9: "Setembro",
+        10: "Outubro",
+        11: "Novembro",
+        12: "Dezembro",
+    }
+    datas_df["nome_mes"] = datas_df["mes"].map(meses)
+
+    dias = {
+        0: "Segunda",
+        1: "Terça",
+        2: "Quarta",
+        3: "Quinta",
+        4: "Sexta",
+        5: "Sábado",
+        6: "Domingo",
+    }
+    datas_df["nome_dia_semana"] = datas_df["dia_semana"].map(dias)
+
+    temp_data["dim_data"] = datas_df.to_dict(orient="records")
+    logger.info(f"Gerada dim_data com {len(datas_df)} registros")
+
+
+def _order_extracted_data(temp_data: dict) -> dict:
+    """Ordena as tabelas na sequência correta de carga."""
     ordem = [
         "dim_programa",
         "dim_fornecedor",
@@ -92,7 +140,7 @@ def run_extract() -> dict:
         "dim_data",
         "dim_projeto",
         "fact_consumo_materiais",
-        "fact_horas_trabalhadas"
+        "fact_horas_trabalhadas",
     ]
 
     ordered_data = {}
@@ -101,3 +149,19 @@ def run_extract() -> dict:
             ordered_data[tabela] = temp_data[tabela]
 
     return ordered_data
+
+
+def run_extract() -> dict:
+    """Orquestra o processo de extração."""
+    logger.info("Extraindo dados")
+    data_path = "data"
+
+    # 1. Leitura dos arquivos
+    temp_data = _read_source_files(data_path)
+
+    # 2. Geração de dimensões dinâmicas
+    _generate_dim_usuario(temp_data)
+    _generate_dim_data(temp_data)
+
+    # 3. Retorno ordenado
+    return _order_extracted_data(temp_data)

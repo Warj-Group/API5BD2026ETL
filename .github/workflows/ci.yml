@@ -1,30 +1,91 @@
-name: SonarCloud Analysis
+name: Backend CI, Patters & SonarCloud
 
 on:
   push:
-    # O SonarCloud analisará cada commit feito nestas branches
     branches:
-      - main
+      - '**'
   pull_request:
-    # O SonarCloud analisará o PR quando o destino (target) for a main
     branches:
-      - main
-      - sprint-*
+      - 'main'
+      - 'sprint-*'
     types: [opened, synchronize, reopened]
 
 jobs:
-  sonarcloud:
-    name: SonarCloud Scan
+  validate-git:
+    name: Validar Git (Branch e Commits)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checar Nome da Branch
+        run: |
+          BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          REGEX="^(main|sprint-[0-9]+)$|^(feature|hotfix|release)\/WARJ-[0-9]+-.+$"
+          if [[ ! $BRANCH =~ $REGEX ]]; then
+            echo "::error::Nome de branch inválido ($BRANCH). Use feature/WARJ-X-nome, hotfix/ ou release/"
+            exit 1
+          fi
+          echo "Nome da branch aprovado: $BRANCH"
+
+      - name: Checar Padrão do Último Commit
+        if: github.event_name == 'push' # <-- Só roda em push, ignora o merge commit do PR
+        run: |
+          COMMIT_MSG=$(git log -1 --format=%s) # <-- %s pega só a primeira linha do commit
+          REGEX="^(feat|fix|doc|style|refactor|test|chore|ci)\/(WARJ-[0-9]+|main|sprint-[0-9]+): .+$"
+          if [[ ! "$COMMIT_MSG" =~ $REGEX ]]; then
+            echo "::error::Mensagem de commit fora do padrão! Lido: '$COMMIT_MSG'"
+            exit 1
+          fi
+          PRIMEIRA_LINHA=$(echo "$COMMIT_MSG" | head -n 1)
+          echo "Mensagem de commit aprovada: $PRIMEIRA_LINHA"
+
+  ci:
+    name: Python Lint (Ruff) & Typecheck
+    needs: validate-git
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Código
-        uses: actions/checkout@v4 # Atualizado para v4 (mais estável)
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
         with:
-          fetch-depth: 0  # Necessário para que o Sonar analise o histórico e blame
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar Ruff e Mypy
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy
+
+      - name: Ruff Check (Erros e Imports)
+        run: ruff check .
+
+      - name: Ruff Format Check (Estilo)
+        run: ruff format --check .
+
+      - name: Mypy (Tipagem)
+        run: mypy .
+
+      - name: Test Production Build (Compileall)
+        if: github.event_name == 'pull_request'
+        run: python -m compileall -q .
+
+  sonarcloud:
+    name: SonarCloud Scan
+    needs: ci
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: SonarCloud Scan
-        # Usamos a action v4.1.0 específica para SonarCloud
         uses: SonarSource/sonarqube-scan-action@2500896589ef8f7247069a56136f8dc177c27ccf
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
