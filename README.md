@@ -3,9 +3,20 @@ Repository for the implementation of an academic project in partnership with a r
 WARJ-10: Adicionado Sprint-1 para inicialiação do projeto
 
 
-# Checa erros de sintaxe e boas práticas (quebra o CI se falhar)
-ruff check .
-# Verifica se a formatação está no padrão (opcional, mas recomendado)
-ruff format --check
-# Conserta os erros nos arquivos
-ruff check --fix .
+### Checks for syntax errors and best practices (breaks CI if it fails)
+> ruff check .
+### Checks if the formatting is standard (optional, but recommended)
+> ruff format --check
+### Fixes errors in files
+> ruff check --fix .
+
+### Create a virtual environment (Run the backend)
+> .venv\Scripts\activate
+
+> uvicorn app.main:app --reload --port 8000
+
+### Install dependencies
+> pip install -r requirements.txt
+
+### Run the ETL
+> python main.py
