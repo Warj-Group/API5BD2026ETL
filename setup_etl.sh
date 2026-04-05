@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "========================================================"
-echo "  WARJ-GROUP - Configurando Ambiente BACKEND (PYTHON)"
+echo "  WARJ-GROUP - Configurando Ambiente ETL (PYTHON)"
 echo "========================================================"
 
 if ! command -v npm &> /dev/null || ! command -v python3 &> /dev/null; then
@@ -84,5 +84,5 @@ chmod +x .husky/commit-msg
 chmod +x .husky/pre-commit
 
 echo "========================================================"
-echo "  ✅ SUCESSO! Ambiente backend configurado."
+echo "  ✅ SUCESSO! Ambiente ETL configurado."
 echo "========================================================"

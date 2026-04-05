@@ -1,4 +1,4 @@
-name: Backend CI, Patters & SonarCloud
+name: ETL CI, Patters & SonarCloud
 
 on:
   push:
