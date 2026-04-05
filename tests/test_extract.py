@@ -14,7 +14,7 @@ def test_identificar_tabela_projeto():
 
 def test_identificar_tabela_erro():
     df = pd.DataFrame({"coluna_qualquer": [1]})
-    
+
     try:
         identificar_tabela(df)
         assert False
@@ -27,9 +27,9 @@ def test_run_extract(monkeypatch):
 
     monkeypatch.setattr("os.listdir", lambda _: ["file1.csv"])
 
-    monkeypatch.setattr("pandas.read_csv", lambda _: pd.DataFrame({
-        "codigo_programa": [1]
-    }))
+    monkeypatch.setattr(
+        "pandas.read_csv", lambda _: pd.DataFrame({"codigo_programa": [1]})
+    )
 
     result = run_extract()
 
