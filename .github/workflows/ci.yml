@@ -30,9 +30,16 @@ jobs:
           echo "Nome da branch aprovado: $BRANCH"
 
       - name: Checar Padrão do Último Commit
-        if: github.event_name == 'push' # <-- Só roda em push, ignora o merge commit do PR
+        if: github.event_name == 'push'
         run: |
           COMMIT_MSG=$(git log -1 --format=%s) # <-- %s pega só a primeira linha do commit
+          
+          # Se for um commit de Merge gerado pelo GitHub, aprova direto
+          if [[ "$COMMIT_MSG" == Merge* ]]; then
+            echo "Commit de merge detectado. Ignorando validação rigorosa."
+            exit 0
+          fi
+          
           REGEX="^(feat|fix|doc|style|refactor|test|chore|ci)\/(WARJ-[0-9]+|main|sprint-[0-9]+): .+$"
           if [[ ! "$COMMIT_MSG" =~ $REGEX ]]; then
             echo "::error::Mensagem de commit fora do padrão! Lido: '$COMMIT_MSG'"
