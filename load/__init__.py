@@ -13,9 +13,7 @@ def normalize_dataframe(df):
 
     for col in id_columns:
         if col in df.columns:
-            df[col] = df[col].where(pd.notna(df[col]), None)
-
-            df[col] = df[col].where(pd.notna(df[col]), None)
+            # Removidas as triplicatas do .where que existiam aqui
             df[col] = df[col].where(pd.notna(df[col]), None)
             try:
                 df[col] = df[col].astype("Int64")
@@ -26,14 +24,14 @@ def normalize_dataframe(df):
 
 
 def get_engine():
-    # Extraímos as variáveis primeiro para manter as linhas curtas e legíveis
+    """Cria a engine de conexão com o PostgreSQL usando variáveis de ambiente."""
     user = os.getenv("DB_USER", "analytics_user")
     password = os.getenv("DB_PASSWORD", "analytics123")
     host = os.getenv("DB_HOST", "localhost")
     port = os.getenv("DB_PORT", "55432")
     db_name = os.getenv("DB_NAME", "project_analytics")
 
-    # Usamos parênteses para permitir a quebra de linha da f-string sem erro de sintaxe
+    # URL quebrada em tupla para respeitar o limite de 88 caracteres (Ruff E501)
     url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db_name}"
 
     return create_engine(url)
@@ -77,7 +75,6 @@ def map_usuario(df, conn):
 
 def map_projeto(df, conn):
     if "projeto_id" in df.columns:
-        df = df.rename(columns={"projeto_id": "projeto_id"})
         return df
 
     projetos = pd.read_sql(
@@ -85,20 +82,13 @@ def map_projeto(df, conn):
     )
 
     possible_cols = ["codigo_projeto", "projeto", "cod_projeto"]
-
-    col_encontrada = None
-    for col in possible_cols:
-        if col in df.columns:
-            col_encontrada = col
-            break
+    col_encontrada = next((c for c in possible_cols if c in df.columns), None)
 
     if not col_encontrada:
-        raise ValueError(
-            f"Nenhuma coluna de projeto encontrada no DataFrame: {df.columns}"
-        )
+        err_msg = f"Nenhuma coluna de projeto encontrada: {df.columns}"
+        raise ValueError(err_msg)
 
     df = df.rename(columns={col_encontrada: "codigo_projeto"})
-
     df = df.merge(projetos, on="codigo_projeto", how="left")
     df = df.rename(columns={"id_projeto": "projeto_id"})
 
@@ -106,10 +96,7 @@ def map_projeto(df, conn):
 
 
 def map_tarefa(df, conn):
-    if "tarefa_id" in df.columns:
-        return df
-
-    if "codigo_tarefa" not in df.columns:
+    if "tarefa_id" in df.columns or "codigo_tarefa" not in df.columns:
         return df
 
     tarefas = pd.read_sql(
@@ -118,15 +105,11 @@ def map_tarefa(df, conn):
 
     df = df.merge(tarefas, on="codigo_tarefa", how="left")
     df = df.rename(columns={"id_tarefa": "tarefa_id"})
-
     return df
 
 
 def map_material(df, conn):
-    if "material_id" in df.columns:
-        return df
-
-    if "codigo_material" not in df.columns:
+    if "material_id" in df.columns or "codigo_material" not in df.columns:
         return df
 
     materiais = pd.read_sql(
@@ -135,15 +118,11 @@ def map_material(df, conn):
 
     df = df.merge(materiais, on="codigo_material", how="left")
     df = df.rename(columns={"id_material": "material_id"})
-
     return df
 
 
 def map_fornecedor(df, conn):
-    if "fornecedor_id" in df.columns:
-        return df
-
-    if "codigo_fornecedor" not in df.columns:
+    if "fornecedor_id" in df.columns or "codigo_fornecedor" not in df.columns:
         return df
 
     fornecedores = pd.read_sql(
@@ -152,15 +131,11 @@ def map_fornecedor(df, conn):
 
     df = df.merge(fornecedores, on="codigo_fornecedor", how="left")
     df = df.rename(columns={"id_fornecedor": "fornecedor_id"})
-
     return df
 
 
 def map_data(df, conn):
-    if "data_id" in df.columns:
-        return df
-
-    if "data" not in df.columns:
+    if "data_id" in df.columns or "data" not in df.columns:
         return df
 
     datas = pd.read_sql("SELECT id_data, data FROM dw_projeto.dim_data", conn)
@@ -176,6 +151,7 @@ def map_data(df, conn):
 
 
 def run_load(data: dict) -> None:
+    """Executa a carga dos dados transformados no Data Warehouse."""
     logger.info("Iniciando carregamento no banco...")
     engine = get_engine()
 
@@ -276,9 +252,9 @@ def run_load(data: dict) -> None:
                 )
                 upsert_data(df_final, db_table, conn, "dw_projeto", pk, engine)
 
+        # Processamento de Fato Horas
         if "fact_horas_trabalhadas" in data:
             logger.info("Processando fato_horas_trabalhadas")
-
             df = pd.DataFrame(data["fact_horas_trabalhadas"])
 
             if "dim_tarefa" in data:
@@ -297,10 +273,8 @@ def run_load(data: dict) -> None:
             df = map_tarefa(df, conn)
             df = map_data(df, conn)
 
-            df = df.drop(
-                columns=["nome_usuario", "codigo_projeto", "codigo_tarefa"],
-                errors="ignore",
-            )
+            drop_cols = ["nome_usuario", "codigo_projeto", "codigo_tarefa"]
+            df = df.drop(columns=drop_cols, errors="ignore")
 
             if "id" in df.columns:
                 df = df.rename(columns={"id": "id_fato_horas"})
@@ -311,9 +285,7 @@ def run_load(data: dict) -> None:
                 )
 
             df = normalize_dataframe(df)
-
-            logger.info(f"{len(df)} registros prontos para carga (horas)")
-
+            logger.info(f"{len(df)} registros para carga (horas)")
             upsert_data(
                 df,
                 "fato_horas_trabalhadas",
@@ -323,9 +295,9 @@ def run_load(data: dict) -> None:
                 engine,
             )
 
+        # Processamento de Fato Materiais
         if "fact_consumo_materiais" in data:
             logger.info("Processando fato_consumo_materiais")
-
             df = pd.DataFrame(data["fact_consumo_materiais"])
 
             if "data_empenho" in df.columns:
@@ -336,30 +308,24 @@ def run_load(data: dict) -> None:
             df = map_fornecedor(df, conn)
             df = map_data(df, conn)
 
-            if "programa_id" not in df.columns:
-                df["programa_id"] = None
-            if "custo_unitario" not in df.columns:
-                df["custo_unitario"] = None
-            if "custo_total" not in df.columns:
-                df["custo_total"] = None
+            # Preenchimento de colunas obrigatórias
+            for col in ["programa_id", "custo_unitario", "custo_total"]:
+                if col not in df.columns:
+                    df[col] = None
 
-            df = df.drop(
-                columns=[
-                    "codigo_projeto",
-                    "codigo_material",
-                    "codigo_fornecedor",
-                    "data",
-                ],
-                errors="ignore",
-            )
+            drop_cols_mat = [
+                "codigo_projeto",
+                "codigo_material",
+                "codigo_fornecedor",
+                "data",
+            ]
+            df = df.drop(columns=drop_cols_mat, errors="ignore")
 
             if "id" in df.columns:
                 df = df.rename(columns={"id": "id_fato_material"})
 
             df = normalize_dataframe(df)
-
-            logger.info(f"{len(df)} registros prontos para carga (materiais)")
-
+            logger.info(f"{len(df)} registros para carga (materiais)")
             upsert_data(
                 df,
                 "fato_consumo_materiais",
