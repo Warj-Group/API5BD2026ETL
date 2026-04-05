@@ -25,13 +25,18 @@ def normalize_dataframe(df):
 
 def get_engine():
     """Cria a engine de conexão com o PostgreSQL usando variáveis de ambiente."""
-    user = os.getenv("DB_USER", "analytics_user")
-    password = os.getenv("DB_PASSWORD", "analytics123")
+    user = os.getenv("DB_USER")
+    password = os.getenv("DB_PASSWORD")
     host = os.getenv("DB_HOST", "localhost")
     port = os.getenv("DB_PORT", "55432")
-    db_name = os.getenv("DB_NAME", "project_analytics")
+    db_name = os.getenv("DB_NAME")
 
-    # URL quebrada em tupla para respeitar o limite de 88 caracteres (Ruff E501)
+    # Verificação básica para auxiliar o debug sem expor a senha
+    if not all([user, password, db_name]):
+        logger.error("Variáveis de ambiente do banco de dados não configuradas!")
+
+    # URL formatada para respeitar o limite de 88 caracteres (Ruff E501)
+    # A quebra de linha dentro dos parênteses é a forma correta no Python
     url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db_name}"
 
     return create_engine(url)
@@ -150,189 +155,190 @@ def map_data(df, conn):
     return df
 
 
+def _process_dimensions(data: dict, conn, engine) -> None:
+    """Processa e carrega todas as tabelas de dimensão básicas."""
+    dims_basicas = {
+        "dim_programa": (
+            "dim_programa",
+            "id_programa",
+            [
+                "id_programa",
+                "codigo_programa",
+                "nome_programa",
+                "gerente_programa",
+                "gerente_tecnico",
+                "data_inicio",
+                "data_fim_prevista",
+                "status",
+            ],
+        ),
+        "dim_fornecedor": (
+            "dim_fornecedor",
+            "id_fornecedor",
+            [
+                "id_fornecedor",
+                "codigo_fornecedor",
+                "razao_social",
+                "cidade",
+                "estado",
+                "categoria",
+                "status",
+            ],
+        ),
+        "dim_material": (
+            "dim_material",
+            "id_material",
+            [
+                "id_material",
+                "codigo_material",
+                "descricao",
+                "categoria",
+                "fabricante",
+                "custo_estimado",
+                "status",
+            ],
+        ),
+        "dim_usuario": (
+            "dim_usuario",
+            "id_usuario",
+            ["id_usuario", "nome_usuario"],
+        ),
+        "dim_tarefa": (
+            "dim_tarefa",
+            "id_tarefa",
+            ["id_tarefa", "codigo_tarefa", "titulo", "estimativa_horas", "status"],
+        ),
+        "dim_data": (
+            "dim_data",
+            "id_data",
+            [
+                "id_data",
+                "data",
+                "dia",
+                "mes",
+                "nome_mes",
+                "trimestre",
+                "ano",
+                "dia_semana",
+                "nome_dia_semana",
+            ],
+        ),
+        "dim_projeto": (
+            "dim_projeto",
+            "id_projeto",
+            ["id_projeto", "codigo_projeto", "nome_projeto", "status"],
+        ),
+    }
+
+    for key, (db_table, pk, cols) in dims_basicas.items():
+        if key not in data:
+            continue
+
+        logger.info(f"Processando {db_table}")
+        df = (
+            data[key]
+            if isinstance(data[key], pd.DataFrame)
+            else pd.DataFrame(data[key])
+        )
+
+        if "id" in df.columns:
+            df = df.rename(columns={"id": pk})
+
+        if "custo_estimado" in df.columns:
+            df["custo_estimado"] = pd.to_numeric(
+                df["custo_estimado"], errors="coerce"
+            ).fillna(0)
+
+        df = normalize_dataframe(df)
+        df_final = df[[c for c in cols if c in df.columns]].drop_duplicates(subset=[pk])
+        upsert_data(df_final, db_table, conn, "dw_projeto", pk, engine)
+
+
+def _process_fact_horas(data: dict, conn, engine) -> None:
+    """Processa e carrega a tabela de fatos de horas trabalhadas."""
+    if "fact_horas_trabalhadas" not in data:
+        return
+
+    logger.info("Processando fato_horas_trabalhadas")
+    df = pd.DataFrame(data["fact_horas_trabalhadas"])
+
+    if "dim_tarefa" in data:
+        dim_tarefa = pd.DataFrame(data["dim_tarefa"])
+        if "id" in dim_tarefa.columns and "projeto_id" in dim_tarefa.columns:
+            tarefa_projeto = dim_tarefa[["id", "projeto_id"]].copy()
+            tarefa_projeto.columns = ["tarefa_id", "projeto_id"]
+            # Mantendo a correção anterior do validate
+            df = df.merge(
+                tarefa_projeto,
+                on="tarefa_id",
+                how="left",
+                suffixes=("", "_tarefa"),
+                validate="many_to_one",
+            )
+
+    df = map_usuario(df, conn)
+    df = map_tarefa(df, conn)
+    df = map_data(df, conn)
+
+    drop_cols = ["nome_usuario", "codigo_projeto", "codigo_tarefa"]
+    df = df.drop(columns=drop_cols, errors="ignore")
+
+    if "id" in df.columns:
+        df = df.rename(columns={"id": "id_fato_horas"})
+
+    if "horas_trabalhadas" in df.columns:
+        df["horas_trabalhadas"] = pd.to_numeric(
+            df["horas_trabalhadas"], errors="coerce"
+        )
+
+    df = normalize_dataframe(df)
+    logger.info(f"{len(df)} registros para carga (horas)")
+    upsert_data(
+        df, "fato_horas_trabalhadas", conn, "dw_projeto", "id_fato_horas", engine
+    )
+
+
+def _process_fact_materiais(data: dict, conn, engine) -> None:
+    """Processa e carrega a tabela de fatos de consumo de materiais."""
+    if "fact_consumo_materiais" not in data:
+        return
+
+    logger.info("Processando fato_consumo_materiais")
+    df = pd.DataFrame(data["fact_consumo_materiais"])
+
+    if "data_empenho" in df.columns:
+        df = df.rename(columns={"data_empenho": "data"})
+
+    df = map_projeto(df, conn)
+    df = map_material(df, conn)
+    df = map_fornecedor(df, conn)
+    df = map_data(df, conn)
+
+    for col in ["programa_id", "custo_unitario", "custo_total"]:
+        if col not in df.columns:
+            df[col] = None
+
+    drop_cols_mat = ["codigo_projeto", "codigo_material", "codigo_fornecedor", "data"]
+    df = df.drop(columns=drop_cols_mat, errors="ignore")
+
+    if "id" in df.columns:
+        df = df.rename(columns={"id": "id_fato_material"})
+
+    df = normalize_dataframe(df)
+    logger.info(f"{len(df)} registros para carga (materiais)")
+    upsert_data(
+        df, "fato_consumo_materiais", conn, "dw_projeto", "id_fato_material", engine
+    )
+
+
 def run_load(data: dict) -> None:
     """Executa a carga dos dados transformados no Data Warehouse."""
     logger.info("Iniciando carregamento no banco...")
     engine = get_engine()
 
     with engine.begin() as conn:
-        dims_basicas = {
-            "dim_programa": (
-                "dim_programa",
-                "id_programa",
-                [
-                    "id_programa",
-                    "codigo_programa",
-                    "nome_programa",
-                    "gerente_programa",
-                    "gerente_tecnico",
-                    "data_inicio",
-                    "data_fim_prevista",
-                    "status",
-                ],
-            ),
-            "dim_fornecedor": (
-                "dim_fornecedor",
-                "id_fornecedor",
-                [
-                    "id_fornecedor",
-                    "codigo_fornecedor",
-                    "razao_social",
-                    "cidade",
-                    "estado",
-                    "categoria",
-                    "status",
-                ],
-            ),
-            "dim_material": (
-                "dim_material",
-                "id_material",
-                [
-                    "id_material",
-                    "codigo_material",
-                    "descricao",
-                    "categoria",
-                    "fabricante",
-                    "custo_estimado",
-                    "status",
-                ],
-            ),
-            "dim_usuario": (
-                "dim_usuario",
-                "id_usuario",
-                ["id_usuario", "nome_usuario"],
-            ),
-            "dim_tarefa": (
-                "dim_tarefa",
-                "id_tarefa",
-                ["id_tarefa", "codigo_tarefa", "titulo", "estimativa_horas", "status"],
-            ),
-            "dim_data": (
-                "dim_data",
-                "id_data",
-                [
-                    "id_data",
-                    "data",
-                    "dia",
-                    "mes",
-                    "nome_mes",
-                    "trimestre",
-                    "ano",
-                    "dia_semana",
-                    "nome_dia_semana",
-                ],
-            ),
-            "dim_projeto": (
-                "dim_projeto",
-                "id_projeto",
-                ["id_projeto", "codigo_projeto", "nome_projeto", "status"],
-            ),
-        }
-
-        for key, (db_table, pk, cols) in dims_basicas.items():
-            if key in data:
-                logger.info(f"Processando {db_table}")
-                df = (
-                    data[key]
-                    if isinstance(data[key], pd.DataFrame)
-                    else pd.DataFrame(data[key])
-                )
-
-                if "id" in df.columns:
-                    df = df.rename(columns={"id": pk})
-
-                if "custo_estimado" in df.columns:
-                    df["custo_estimado"] = pd.to_numeric(
-                        df["custo_estimado"], errors="coerce"
-                    ).fillna(0)
-
-                df = normalize_dataframe(df)
-                df_final = df[[c for c in cols if c in df.columns]].drop_duplicates(
-                    subset=[pk]
-                )
-                upsert_data(df_final, db_table, conn, "dw_projeto", pk, engine)
-
-        # Processamento de Fato Horas
-        if "fact_horas_trabalhadas" in data:
-            logger.info("Processando fato_horas_trabalhadas")
-            df = pd.DataFrame(data["fact_horas_trabalhadas"])
-
-            if "dim_tarefa" in data:
-                dim_tarefa = pd.DataFrame(data["dim_tarefa"])
-                if "id" in dim_tarefa.columns and "projeto_id" in dim_tarefa.columns:
-                    tarefa_projeto = dim_tarefa[["id", "projeto_id"]].copy()
-                    tarefa_projeto.columns = ["tarefa_id", "projeto_id"]
-                    df = df.merge(
-                        tarefa_projeto,
-                        on="tarefa_id",
-                        how="left",
-                        suffixes=("", "_tarefa"),
-                    )
-
-            df = map_usuario(df, conn)
-            df = map_tarefa(df, conn)
-            df = map_data(df, conn)
-
-            drop_cols = ["nome_usuario", "codigo_projeto", "codigo_tarefa"]
-            df = df.drop(columns=drop_cols, errors="ignore")
-
-            if "id" in df.columns:
-                df = df.rename(columns={"id": "id_fato_horas"})
-
-            if "horas_trabalhadas" in df.columns:
-                df["horas_trabalhadas"] = pd.to_numeric(
-                    df["horas_trabalhadas"], errors="coerce"
-                )
-
-            df = normalize_dataframe(df)
-            logger.info(f"{len(df)} registros para carga (horas)")
-            upsert_data(
-                df,
-                "fato_horas_trabalhadas",
-                conn,
-                "dw_projeto",
-                "id_fato_horas",
-                engine,
-            )
-
-        # Processamento de Fato Materiais
-        if "fact_consumo_materiais" in data:
-            logger.info("Processando fato_consumo_materiais")
-            df = pd.DataFrame(data["fact_consumo_materiais"])
-
-            if "data_empenho" in df.columns:
-                df = df.rename(columns={"data_empenho": "data"})
-
-            df = map_projeto(df, conn)
-            df = map_material(df, conn)
-            df = map_fornecedor(df, conn)
-            df = map_data(df, conn)
-
-            # Preenchimento de colunas obrigatórias
-            for col in ["programa_id", "custo_unitario", "custo_total"]:
-                if col not in df.columns:
-                    df[col] = None
-
-            drop_cols_mat = [
-                "codigo_projeto",
-                "codigo_material",
-                "codigo_fornecedor",
-                "data",
-            ]
-            df = df.drop(columns=drop_cols_mat, errors="ignore")
-
-            if "id" in df.columns:
-                df = df.rename(columns={"id": "id_fato_material"})
-
-            df = normalize_dataframe(df)
-            logger.info(f"{len(df)} registros para carga (materiais)")
-            upsert_data(
-                df,
-                "fato_consumo_materiais",
-                conn,
-                "dw_projeto",
-                "id_fato_material",
-                engine,
-            )
+        _process_dimensions(data, conn, engine)
+        _process_fact_horas(data, conn, engine)
+        _process_fact_materiais(data, conn, engine)
 
     logger.info("Carregamento finalizado com sucesso!")

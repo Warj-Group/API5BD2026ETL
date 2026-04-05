@@ -1,9 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo ========================================================
+SEPARATOR="========================================================"
+
+echo "$SEPARATOR"
 echo   WARJ-GROUP - Configurando Ambiente ETL (PYTHON)
-echo ========================================================
+echo "$SEPARATOR"
 
 :: Verificar dependencias
 where npm >nul 2>nul || (echo [ERRO] npm nao encontrado. & pause & exit /b 1)
@@ -79,7 +81,7 @@ echo echo "🔍 Checando tipagem com Mypy..."
 echo mypy .
 ) > .husky\pre-commit
 
-echo ========================================================
+echo "$SEPARATOR"
 echo   SUCESSO! Ambiente ETL Configurado.
-echo ========================================================
+echo "$SEPARATOR"
 pause

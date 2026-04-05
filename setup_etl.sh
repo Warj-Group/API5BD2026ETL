@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo "========================================================"
-echo "  WARJ-GROUP - Configurando Ambiente BACKEND (PYTHON)"
-echo "========================================================"
+SEPARATOR="========================================================"
+
+echo "$SEPARATOR"
+echo "  WARJ-GROUP - Configurando Ambiente ETL (PYTHON)"
+echo "$SEPARATOR"
 
 if ! command -v npm &> /dev/null || ! command -v python3 &> /dev/null; then
     echo "❌ ERRO: npm ou python3 não encontrados."
@@ -83,6 +85,6 @@ EOF
 chmod +x .husky/commit-msg
 chmod +x .husky/pre-commit
 
-echo "========================================================"
-echo "  ✅ SUCESSO! Ambiente backend configurado."
-echo "========================================================"
+echo "$SEPARATOR"
+echo "  ✅ SUCESSO! Ambiente ETL configurado."
+echo "$SEPARATOR"
