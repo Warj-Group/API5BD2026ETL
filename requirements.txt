@@ -7,4 +7,3 @@ requests==2.31.0
 petl==1.7.15
 ruff==0.15.8
 mypy==1.9.0
-npm==10.9.4

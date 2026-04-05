@@ -9,14 +9,20 @@ echo ========================================================
 where npm >nul 2>nul || (echo [ERRO] npm nao encontrado. & pause & exit /b 1)
 where python >nul 2>nul || (echo [ERRO] python nao encontrado. & pause & exit /b 1)
 
-echo [1/6] Instalando dependencias de Git (Husky + Commitlint)...
+echo [1/7] Criando e ativando ambiente virtual (.venv)...
+if not exist .venv (
+    python -m venv .venv
+)
+call .venv\Scripts\activate
+
+echo [2/7] Instalando dependencias de Git (Husky + Commitlint)...
 call npm init -y
 call npm install --ignore-scripts --save-dev husky @commitlint/cli @commitlint/config-conventional
 
-echo [2/6] Instalando dependencias a partir do requirements.txt...
+echo [3/7] Instalando dependencias a partir do requirements.txt...
 call pip install -r requirements.txt
 
-echo [3/6] Criando arquivo central de configuracoes (pyproject.toml)...
+echo [4/7] Criando arquivo central de configuracoes (pyproject.toml)...
 (
 echo [tool.ruff]
 echo line-length = 88
@@ -31,7 +37,7 @@ echo python_version = "3.11"
 echo ignore_missing_imports = true
 ) > pyproject.toml
 
-echo [4/6] Criando commitlint.config.js...
+echo [5/7] Criando commitlint.config.js...
 (
 echo module.exports = {
 echo   parserPreset: {
@@ -48,10 +54,10 @@ echo   }
 echo };
 ) > commitlint.config.js
 
-echo [5/6] Inicializando Husky...
+echo [6/7] Inicializando Husky...
 call npm exec husky init
 
-echo [6/6] Configurando Hooks de seguranca...
+echo [7/7] Configurando Hooks de seguranca...
 
 :: Hook de Mensagem
 (
