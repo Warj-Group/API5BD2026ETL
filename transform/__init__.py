@@ -1,7 +1,9 @@
-import pandas as pd
 import logging
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
+
 
 def convert_dates(df, columns):
     for col in columns:
@@ -9,21 +11,32 @@ def convert_dates(df, columns):
             try:
                 df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
                 if df[col].isnull().all():
-                    df[col] = pd.to_datetime(df[col], unit="ns", errors="coerce").dt.date
+                    df[col] = pd.to_datetime(
+                        df[col], unit="ns", errors="coerce"
+                    ).dt.date
             except Exception:
                 df[col] = pd.to_datetime(df[col], unit="ns", errors="coerce").dt.date
     return df
 
+
 def remove_ids(df, table_name=""):
-    foreign_keys = ["programa_id", "projeto_id", "tarefa_id", "usuario_id", "material_id", "fornecedor_id", "data_id"]
-    
+    foreign_keys = [
+        "programa_id",
+        "projeto_id",
+        "tarefa_id",
+        "usuario_id",
+        "material_id",
+        "fornecedor_id",
+        "data_id",
+    ]
+
     cols_to_drop = []
     for col in df.columns:
         if col == "id":
             cols_to_drop.append(col)
         elif col.startswith("id_") and col not in foreign_keys:
             cols_to_drop.append(col)
-    
+
     return df.drop(columns=cols_to_drop, errors="ignore")
 
 
@@ -36,26 +49,25 @@ def clean_strings(df):
 def clean_horas_trabalhadas(df):
     if "horas_trabalhadas" not in df.columns:
         return df
-    
+
     def is_valid_hours(val):
         try:
             float(val)
             return True
         except (ValueError, TypeError):
             return False
-    
+
     df = df[df["horas_trabalhadas"].apply(is_valid_hours)]
-    
-    df["horas_trabalhadas"] = pd.to_numeric(df["horas_trabalhadas"], errors='coerce')
-    
+
+    df["horas_trabalhadas"] = pd.to_numeric(df["horas_trabalhadas"], errors="coerce")
+
     return df
 
 
 def fill_defaults(df):
-    df = df.fillna({
-        "status": "Ativo"
-    })
+    df = df.fillna({"status": "Ativo"})
     return df
+
 
 def run_transform(raw_data: dict) -> dict:
     logger.info("Transformando dados...")

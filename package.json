@@ -1,0 +1,29 @@
+{
+  "name": "api5bd2026etl",
+  "version": "1.0.0",
+  "description": "Repository for the implementation of an academic project in partnership with a real company. API5 2026.1 Fatec SJC/SP.\r WARJ-10: Adicionado Sprint-1 para inicialiação do projeto",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Warj-Group/API5BD2026ETL.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Warj-Group/API5BD2026ETL/issues"
+  },
+  "homepage": "https://github.com/Warj-Group/API5BD2026ETL#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "husky": "^9.1.7"
+  }
+}
