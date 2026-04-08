@@ -1,68 +1,37 @@
 import logging
 
-from dotenv import load_dotenv
-
-from extract import run_extract
-from load import run_load
-from transform import run_transform
-from validation import validar_carga
-
-load_dotenv()
-
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
-logger = logging.getLogger(__name__)
+from config.settings import settings
+from extract.reader import extract_all
+from load_raw.loader import load_raw_tables
+from transform.pipeline import build_star_data
+from load_dw.loader import load_dw
 
 
-def main():
-    logger.info("Iniciando pipeline ETL...")
-    raw_data = run_extract()
-    transformed_data = run_transform(raw_data)
-    run_load(transformed_data)
-    validar_carga()
-    logger.info("Pipeline ETL finalizado com sucesso.")
+def configure_logging() -> None:
+    logging.basicConfig(
+        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+
+
+def main() -> None:
+    configure_logging()
+    logger = logging.getLogger(__name__)
+
+    logger.info("Iniciando ETL")
+    raw_data = extract_all(settings.DATA_DIR)
+
+    logger.info("Carregando staging raw")
+    load_raw_tables(raw_data)
+
+    logger.info("Transformando para modelo estrela")
+    star_data = build_star_data(raw_data)
+
+    logger.info("Carregando DW")
+    load_dw(star_data)
+
+    logger.info("ETL finalizado com sucesso")
 
 
 if __name__ == "__main__":
     main()
-
-
-"""
-
-**`requirements.txt`**
-
-pandas==2.2.0
-sqlalchemy==2.0.25
-psycopg2-binary==2.9.9
-python-dotenv==1.0.0
-openpyxl==3.1.2
-requests==2.31.0
-
-
----
-
-**`.env.example`**
-
-DB_HOST=localhost
-DB_PORT=55432
-DB_NAME=project_analytics
-DB_USER=analytics_user
-DB_PASSWORD=
-
-
----
-
-**`.gitignore`**
-
-venv/
-.venv/
-.env
-_pycache_/
-*.pyc
-*.log
-.idea/
-data/
-*.csv
-*.xlsx
-"""
