@@ -1,5 +1,5 @@
 import logging
-### teste
+import pandas as pd
 from sqlalchemy import text
 
 from db.database import get_engine
@@ -7,7 +7,7 @@ from db.database import get_engine
 logger = logging.getLogger(__name__)
 
 
-def load_raw_tables(raw_data: dict[str, object]) -> None:
+def load_raw_tables(raw_data: dict[str, pd.DataFram]) -> None:
     engine = get_engine()
 
     with engine.begin() as conn:
