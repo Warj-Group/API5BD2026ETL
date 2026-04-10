@@ -25,7 +25,9 @@ def extract_all(data_dir: str) -> dict[str, pd.DataFrame]:
 
     data: dict[str, pd.DataFrame] = {}
 
-    missing = [filename for filename in EXPECTED_FILES if not (base / filename).exists()]
+    missing = [
+        filename for filename in EXPECTED_FILES if not (base / filename).exists()
+    ]
     if missing:
         raise FileNotFoundError(f"Arquivos ausentes: {missing}")
 

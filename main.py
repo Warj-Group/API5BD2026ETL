@@ -2,9 +2,9 @@ import logging
 
 from config.settings import settings
 from extract.reader import extract_all
+from load_dw.loader import load_dw
 from load_raw.loader import load_raw_tables
 from transform.pipeline import build_star_data
-from load_dw.loader import load_dw
 
 
 def configure_logging() -> None:

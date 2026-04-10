@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+
 import pandas as pd
 from sqlalchemy import MetaData, Table
 from sqlalchemy.dialects.postgresql import insert
+
 from config.database import get_engine
 
 logger = logging.getLogger(__name__)
@@ -34,7 +36,6 @@ UNIQUE_KEYS = {
     "dim_usuario": ["nome_usuario"],
     "dim_localizacao": ["localizacao"],
     "dim_data": ["data_key"],  # 🔥 corrigido
-
     "fato_horas_trabalhadas": ["horas_trabalhadas_orig_id"],
     "fato_solicitacoes_compra": ["solicitacao_orig_id"],
     "fato_pedidos_compra": ["pedido_compra_orig_id"],
@@ -60,14 +61,17 @@ PRIMARY_KEYS = {
     "fato_estoque_materiais_projeto": "fato_estoque_key",
 }
 
+
 def _normalize_value(value):
     if pd.isna(value):
         return None
     return value
 
+
 def _prepare_records(df: pd.DataFrame) -> list[dict]:
     records = df.to_dict(orient="records")
     return [{k: _normalize_value(v) for k, v in row.items()} for row in records]
+
 
 def load_dw(data: dict[str, pd.DataFrame]) -> None:
     engine = get_engine()

@@ -34,7 +34,11 @@ def parse_decimal(series: pd.Series) -> pd.Series:
         value = str(value).strip()
         if not value:
             return None
-        value = value.replace(".", "").replace(",", ".") if value.count(",") == 1 and value.count(".") > 1 else value.replace(",", ".")
+        value = (
+            value.replace(".", "").replace(",", ".")
+            if value.count(",") == 1 and value.count(".") > 1
+            else value.replace(",", ".")
+        )
         try:
             return float(value)
         except ValueError:
@@ -57,7 +61,9 @@ def parse_mixed_date(series: pd.Series) -> pd.Series:
 
         if isinstance(value, (int, float)):
             if 1 <= float(value) <= 60000:
-                converted = pd.to_datetime(value, unit="D", origin="1899-12-30", errors="coerce")
+                converted = pd.to_datetime(
+                    value, unit="D", origin="1899-12-30", errors="coerce"
+                )
                 return converted.normalize() if pd.notna(converted) else pd.NaT
 
         text = str(value).strip()

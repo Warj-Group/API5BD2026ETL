@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pandas as pd
 
-from utils.normalizers import clean_text, parse_decimal, parse_mixed_date, safe_int, union_text_values
+from utils.normalizers import (
+    clean_text,
+    parse_decimal,
+    parse_mixed_date,
+    safe_int,
+    union_text_values,
+)
 
 
 def _add_unknown_row(df: pd.DataFrame, key_col: str, defaults: dict) -> pd.DataFrame:
@@ -21,7 +27,13 @@ def _add_unknown_row(df: pd.DataFrame, key_col: str, defaults: dict) -> pd.DataF
     return pd.concat([unknown_df, df], ignore_index=True)
 
 
-def _lookup_key(df: pd.DataFrame, dim: pd.DataFrame, source_col: str, dim_natural_col: str, dim_key_col: str) -> pd.Series:
+def _lookup_key(
+    df: pd.DataFrame,
+    dim: pd.DataFrame,
+    source_col: str,
+    dim_natural_col: str,
+    dim_key_col: str,
+) -> pd.Series:
     mapping = dim.set_index(dim_natural_col)[dim_key_col].to_dict()
     return df[source_col].map(mapping).fillna(0).astype(int)
 
@@ -38,7 +50,9 @@ def build_dim_programa(df: pd.DataFrame) -> pd.DataFrame:
     dim["status"] = clean_text(dim["status"])
 
     dim = dim.rename(columns={"id": "programa_orig_id"})
-    dim = dim.drop_duplicates(subset=["programa_orig_id"]).sort_values("programa_orig_id")
+    dim = dim.drop_duplicates(subset=["programa_orig_id"]).sort_values(
+        "programa_orig_id"
+    )
     dim.insert(0, "programa_key", range(1, len(dim) + 1))
 
     dim = dim[
@@ -191,7 +205,9 @@ def build_dim_material(df: pd.DataFrame) -> pd.DataFrame:
     dim["status"] = clean_text(dim["status"])
 
     dim = dim.rename(columns={"id": "material_orig_id"})
-    dim = dim.drop_duplicates(subset=["material_orig_id"]).sort_values("material_orig_id")
+    dim = dim.drop_duplicates(subset=["material_orig_id"]).sort_values(
+        "material_orig_id"
+    )
     dim.insert(0, "material_key", range(1, len(dim) + 1))
 
     dim = dim[
@@ -232,7 +248,9 @@ def build_dim_fornecedor(df: pd.DataFrame) -> pd.DataFrame:
     dim["status"] = clean_text(dim["status"])
 
     dim = dim.rename(columns={"id": "fornecedor_orig_id"})
-    dim = dim.drop_duplicates(subset=["fornecedor_orig_id"]).sort_values("fornecedor_orig_id")
+    dim = dim.drop_duplicates(subset=["fornecedor_orig_id"]).sort_values(
+        "fornecedor_orig_id"
+    )
     dim.insert(0, "fornecedor_key", range(1, len(dim) + 1))
 
     dim = dim[
@@ -277,7 +295,11 @@ def build_dim_usuario(
     )
 
     dim = pd.DataFrame({"nome_usuario": nomes})
-    dim = dim[dim["nome_usuario"] != "NÃO INFORMADO"].drop_duplicates().sort_values("nome_usuario")
+    dim = (
+        dim[dim["nome_usuario"] != "NÃO INFORMADO"]
+        .drop_duplicates()
+        .sort_values("nome_usuario")
+    )
     dim.insert(0, "usuario_key", range(1, len(dim) + 1))
     return _add_unknown_row(
         dim.reset_index(drop=True),
@@ -288,7 +310,11 @@ def build_dim_usuario(
 
 def build_dim_localizacao(df: pd.DataFrame) -> pd.DataFrame:
     dim = pd.DataFrame({"localizacao": clean_text(df["localizacao"])})
-    dim = dim[dim["localizacao"] != "NÃO INFORMADO"].drop_duplicates().sort_values("localizacao")
+    dim = (
+        dim[dim["localizacao"] != "NÃO INFORMADO"]
+        .drop_duplicates()
+        .sort_values("localizacao")
+    )
     dim.insert(0, "localizacao_key", range(1, len(dim) + 1))
     return _add_unknown_row(
         dim.reset_index(drop=True),
@@ -356,7 +382,13 @@ def build_dim_data(raw_data: dict[str, pd.DataFrame]) -> pd.DataFrame:
         },
     )
 
-def build_fato_horas_trabalhadas(df: pd.DataFrame, dim_tarefa: pd.DataFrame, dim_usuario: pd.DataFrame, dim_data: pd.DataFrame) -> pd.DataFrame:
+
+def build_fato_horas_trabalhadas(
+    df: pd.DataFrame,
+    dim_tarefa: pd.DataFrame,
+    dim_usuario: pd.DataFrame,
+    dim_data: pd.DataFrame,
+) -> pd.DataFrame:
     fato = df.copy()
     fato["id"] = safe_int(fato["id"])
     fato["tarefa_id"] = safe_int(fato["tarefa_id"])
@@ -395,7 +427,12 @@ def build_fato_horas_trabalhadas(df: pd.DataFrame, dim_tarefa: pd.DataFrame, dim
     ]
 
 
-def build_fato_solicitacoes_compra(df: pd.DataFrame, dim_projeto: pd.DataFrame, dim_material: pd.DataFrame, dim_data: pd.DataFrame) -> pd.DataFrame:
+def build_fato_solicitacoes_compra(
+    df: pd.DataFrame,
+    dim_projeto: pd.DataFrame,
+    dim_material: pd.DataFrame,
+    dim_data: pd.DataFrame,
+) -> pd.DataFrame:
     fato = df.copy()
     fato["id"] = safe_int(fato["id"])
     fato["projeto_id"] = safe_int(fato["projeto_id"])
@@ -420,7 +457,9 @@ def build_fato_solicitacoes_compra(df: pd.DataFrame, dim_projeto: pd.DataFrame, 
         "material_orig_id",
         "material_key",
     )
-    fato["data_key"] = fato["data_solicitacao"].dt.strftime("%Y%m%d").fillna("0").astype(int)
+    fato["data_key"] = (
+        fato["data_solicitacao"].dt.strftime("%Y%m%d").fillna("0").astype(int)
+    )
     fato.loc[~fato["data_key"].isin(dim_data["data_key"]), "data_key"] = 0
 
     fato = fato.rename(columns={"id": "solicitacao_orig_id"})
@@ -440,7 +479,12 @@ def build_fato_solicitacoes_compra(df: pd.DataFrame, dim_projeto: pd.DataFrame, 
     ]
 
 
-def build_fato_pedidos_compra(df: pd.DataFrame, solicitacoes: pd.DataFrame, dim_fornecedor: pd.DataFrame, dim_data: pd.DataFrame) -> pd.DataFrame:
+def build_fato_pedidos_compra(
+    df: pd.DataFrame,
+    solicitacoes: pd.DataFrame,
+    dim_fornecedor: pd.DataFrame,
+    dim_data: pd.DataFrame,
+) -> pd.DataFrame:
     fato = df.copy()
     fato["id"] = safe_int(fato["id"])
     fato["solicitacao_id"] = safe_int(fato["solicitacao_id"])
@@ -470,10 +514,16 @@ def build_fato_pedidos_compra(df: pd.DataFrame, solicitacoes: pd.DataFrame, dim_
         "fornecedor_orig_id",
         "fornecedor_key",
     )
-    fato["data_pedido_key"] = fato["data_pedido"].dt.strftime("%Y%m%d").fillna("0").astype(int)
-    fato["data_previsao_key"] = fato["data_previsao_entrega"].dt.strftime("%Y%m%d").fillna("0").astype(int)
+    fato["data_pedido_key"] = (
+        fato["data_pedido"].dt.strftime("%Y%m%d").fillna("0").astype(int)
+    )
+    fato["data_previsao_key"] = (
+        fato["data_previsao_entrega"].dt.strftime("%Y%m%d").fillna("0").astype(int)
+    )
     fato.loc[~fato["data_pedido_key"].isin(dim_data["data_key"]), "data_pedido_key"] = 0
-    fato.loc[~fato["data_previsao_key"].isin(dim_data["data_key"]), "data_previsao_key"] = 0
+    fato.loc[
+        ~fato["data_previsao_key"].isin(dim_data["data_key"]), "data_previsao_key"
+    ] = 0
 
     fato = fato.rename(columns={"id": "pedido_compra_orig_id"})
     fato.insert(0, "fato_pedido_key", range(1, len(fato) + 1))
@@ -494,7 +544,9 @@ def build_fato_pedidos_compra(df: pd.DataFrame, solicitacoes: pd.DataFrame, dim_
     ]
 
 
-def build_fato_compras_projeto(df: pd.DataFrame, dim_projeto: pd.DataFrame) -> pd.DataFrame:
+def build_fato_compras_projeto(
+    df: pd.DataFrame, dim_projeto: pd.DataFrame
+) -> pd.DataFrame:
     fato = df.copy()
     fato["id"] = safe_int(fato["id"])
     fato["pedido_compra_id"] = safe_int(fato["pedido_compra_id"])
@@ -522,7 +574,12 @@ def build_fato_compras_projeto(df: pd.DataFrame, dim_projeto: pd.DataFrame) -> p
     ]
 
 
-def build_fato_empenho_materiais(df: pd.DataFrame, dim_projeto: pd.DataFrame, dim_material: pd.DataFrame, dim_data: pd.DataFrame) -> pd.DataFrame:
+def build_fato_empenho_materiais(
+    df: pd.DataFrame,
+    dim_projeto: pd.DataFrame,
+    dim_material: pd.DataFrame,
+    dim_data: pd.DataFrame,
+) -> pd.DataFrame:
     fato = df.copy()
     fato["id"] = safe_int(fato["id"])
     fato["projeto_id"] = safe_int(fato["projeto_id"])
@@ -544,7 +601,9 @@ def build_fato_empenho_materiais(df: pd.DataFrame, dim_projeto: pd.DataFrame, di
         "material_orig_id",
         "material_key",
     )
-    fato["data_key"] = fato["data_empenho"].dt.strftime("%Y%m%d").fillna("0").astype(int)
+    fato["data_key"] = (
+        fato["data_empenho"].dt.strftime("%Y%m%d").fillna("0").astype(int)
+    )
     fato.loc[~fato["data_key"].isin(dim_data["data_key"]), "data_key"] = 0
 
     fato = fato.rename(columns={"id": "empenho_material_orig_id"})
@@ -561,7 +620,12 @@ def build_fato_empenho_materiais(df: pd.DataFrame, dim_projeto: pd.DataFrame, di
     ]
 
 
-def build_fato_estoque_materiais_projeto(df: pd.DataFrame, dim_projeto: pd.DataFrame, dim_material: pd.DataFrame, dim_localizacao: pd.DataFrame) -> pd.DataFrame:
+def build_fato_estoque_materiais_projeto(
+    df: pd.DataFrame,
+    dim_projeto: pd.DataFrame,
+    dim_material: pd.DataFrame,
+    dim_localizacao: pd.DataFrame,
+) -> pd.DataFrame:
     fato = df.copy()
     fato["id"] = safe_int(fato["id"])
     fato["projeto_id"] = safe_int(fato["projeto_id"])
